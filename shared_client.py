@@ -1,81 +1,57 @@
-# ===============================================
-# shared_client.py — Safe Render-Ready Version
-# ===============================================
 import os
 import asyncio
-import time
-from pyrogram import Client, errors as pyro_errors
-from telethon import TelegramClient, errors as tele_errors
+from pyrogram import Client, filters
+from pyrogram.errors import FloodWait
 
-# Load environment variables
-API_ID = int(os.getenv("API_ID", 0))
+API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-STRING_SESSION = os.getenv("STRING_SESSION", None)
+STRING_SESSION = os.getenv("STRING_SESSION")
+OWNER_ID = int(os.getenv("OWNER_ID", 0))
 
-# Optional Mongo / Database URLs (ignore if not used)
-MONGO_URL = os.getenv("MONGO_URL", None)
-
-# ===============================================
-# Function: Start both Clients (Pyrogram + Telethon)
-# ===============================================
-
-async def start_client():
-    print("🚀 Starting clients...")
-
-    # --- Pyrogram bot client ---
-    bot = Client(
-        "bot_session",
+# If STRING_SESSION exists → use userbot session, else normal bot
+if STRING_SESSION:
+    app = Client(
+        "serena_userbot",
+        api_id=API_ID,
+        api_hash=API_HASH,
+        session_string=STRING_SESSION,
+    )
+else:
+    app = Client(
+        "serena_bot",
         api_id=API_ID,
         api_hash=API_HASH,
         bot_token=BOT_TOKEN,
-        in_memory=True  # safer for Render
     )
 
-    # --- Telethon (optional user session if provided) ---
-    telethon_client = None
-    if STRING_SESSION:
-        try:
-            telethon_client = TelegramClient(
-                "telethon_session",
-                API_ID,
-                API_HASH
-            )
-            await telethon_client.start()
-            print("✅ Telethon client started (owner session active)")
-        except Exception as e:
-            print(f"⚠️ Telethon error: {e}")
+# --- BOT COMMANDS ---
 
-    # --- Start Pyrogram bot with safe flood handling ---
-    while True:
-        try:
-            await bot.start()
-            print("✅ Pyrogram bot started successfully!")
-            break
-        except pyro_errors.FloodWait as e:
-            print(f"⚠️ Flood wait {e.value} seconds. Sleeping...")
-            await asyncio.sleep(e.value)
-        except Exception as e:
-            print(f"❌ Pyrogram start error: {e}")
-            await asyncio.sleep(10)
+@app.on_message(filters.command("start"))
+async def start_cmd(client, message):
+    await message.reply_text(
+        "💫 **Hello Sweetheart!**\n"
+        "I'm alive and working perfectly on Render ❤️\n\n"
+        "✨ Powered by Serena Technologies ✨"
+    )
 
-    # --- Keep connection alive ---
+@app.on_message(filters.text & ~filters.command(["start"]))
+async def echo(client, message):
     try:
-        me = await bot.get_me()
-        print(f"🤖 Logged in as: {me.first_name} (@{me.username})")
-    except Exception as e:
-        print(f"⚠️ Could not get bot info: {e}")
+        await message.reply_text(f"💌 You said: {message.text}")
+    except FloodWait as e:
+        print(f"⏳ FloodWait of {e.value} seconds. Sleeping...")
+        await asyncio.sleep(e.value)
 
-    # --- Background safety loop ---
-    while True:
-        try:
-            await asyncio.sleep(60)
-        except (pyro_errors.FloodWait, tele_errors.FloodWaitError) as e:
-            print(f"⚠️ Global flood wait: {e.seconds} seconds")
-            await asyncio.sleep(e.seconds)
-        except Exception as e:
-            print(f"⚠️ Keep-alive error: {e}")
-            await asyncio.sleep(30)
+# --- START CLIENT ---
 
-    # --- Return main clients for plugin use ---
-    return bot, telethon_client
+def start_client():
+    print("🚀 Starting Telegram bot client...")
+    try:
+        app.run()
+    except FloodWait as e:
+        print(f"⚠️ FloodWait triggered for {e.value} seconds. Retrying...")
+        asyncio.sleep(e.value)
+        app.run()
+    except Exception as ex:
+        print(f"❌ Error while running bot: {ex}")
