@@ -1,29 +1,30 @@
 import os
 import asyncio
+import threading
 from flask import Flask
 from pyrogram import Client, filters
 
-# Flask app setup
+# ---------------- Flask Server (for Render ping) ----------------
 app = Flask(__name__)
 
 @app.route('/')
 def home():
     return "💫 Serena Save Bot is alive on Render 💫"
 
-# --- Telegram Client Setup ---
-API_ID = int(os.getenv("API_ID", "0"))
-API_HASH = os.getenv("API_HASH", "")
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-STRING_SESSION = os.getenv("STRING_SESSION", "")
-OWNER_ID = int(os.getenv("OWNER_ID", "0"))
+def run_flask():
+    port = int(os.getenv("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
 
-# --- Client selection ---
-if STRING_SESSION:
-    bot = Client("serena_userbot", api_id=API_ID, api_hash=API_HASH, session_string=STRING_SESSION)
-else:
-    bot = Client("serena_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+# ---------------- Telegram Bot Setup ----------------
+API_ID = int(os.getenv("API_ID"))
+API_HASH = os.getenv("API_HASH")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+OWNER_ID = int(os.getenv("OWNER_ID", 0))
 
-# --- Telegram Commands ---
+# Use only bot token (no string session)
+bot = Client("serena_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+
+# ---------------- Telegram Commands ----------------
 @bot.on_message(filters.command("start"))
 async def start_cmd(client, message):
     await message.reply_text(
@@ -36,17 +37,20 @@ async def start_cmd(client, message):
 async def echo(client, message):
     await message.reply_text(f"💌 You said: {message.text}")
 
-# --- Run both Flask & Bot together ---
+# ---------------- Run Flask + Bot Together ----------------
 async def run_all():
-    # Run Flask in background
-    asyncio.create_task(asyncio.to_thread(
-        app.run, host="0.0.0.0", port=int(os.getenv("PORT", 8080))
-    ))
+    # Run Flask server in a background thread
+    threading.Thread(target=run_flask, daemon=True).start()
 
-    # Run Telegram bot
+    # Start Telegram bot
     await bot.start()
     print("🚀 Bot started successfully on Render!")
-    await bot.idle()  # Keeps it alive
+
+    # Keep the bot running
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
-    asyncio.run(run_all())
+    try:
+        asyncio.run(run_all())
+    except (KeyboardInterrupt, SystemExit):
+        print("Bot stopped manually 💔")
