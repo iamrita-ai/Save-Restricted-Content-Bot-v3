@@ -1,9 +1,17 @@
-pyrogram
+pyrogram==2.0.106
 tgcrypto
 flask
-werkzeug==2.2.2
-aiohttp
-requests
+python-dotenv
 pymongo
 motor
+aiohttp
+requests
+yt-dlp
+Pillow
+mutagen
 cryptography
+# add other plugin-specific deps if your plugins require them:
+# aiofiles
+# opencv-python-headless
+# psutil
+# devgagantools
